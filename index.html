@@ -13,14 +13,14 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // PASTE YOUR FIREBASE KEYS HERE
+    // Your Active Firebase Configuration
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyCR1ANJK9eVpovWJLScGta-kSAZz3yxbMM",
+      authDomain: "budget-tracker-e034f.firebaseapp.com",
+      projectId: "budget-tracker-e034f",
+      storageBucket: "budget-tracker-e034f.firebasestorage.app",
+      messagingSenderId: "225777062168",
+      appId: "1:225777062168:web:f716926d559cffbbad4e6d"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -29,7 +29,7 @@
 
     window.budgetData = [];
 
-    // Real-Time Listener: Listens for cloud updates automatically
+    // Real-Time Cloud Listener
     onSnapshot(budgetDocRef, (docSnap) => {
       if (docSnap.exists()) {
         window.budgetData = docSnap.data().categories || [];
@@ -45,7 +45,7 @@
       try {
         await setDoc(budgetDocRef, { categories: updatedData });
       } catch (e) {
-        console.error("Sync Error: ", e);
+        console.error("Firebase Sync Error: ", e);
       }
     };
 
@@ -55,36 +55,61 @@
           id: "income",
           title: "Income Sources",
           isIncomeCategory: true,
-          items: [{ name: "Net Salary / Primary Income", amount: 120000 }]
+          items: [
+            { name: "Net Salary / Primary Income", amount: 120000 },
+            { name: "Side Business / Freelance", amount: 25000 }
+          ]
         },
         {
           id: "mshwari_loans",
           title: "M-Shwari & Mobile Loans",
           isLoanCategory: true,
-          items: [{ name: "Fuliza Overdraft", balance: 5000, payment: 2000, paid: 1000, interest: 250 }]
+          items: [
+            { name: "Fuliza Overdraft Balance", balance: 5000, payment: 2000, paid: 1000, interest: 250 },
+            { name: "M-Shwari Personal Facility 1", balance: 15000, payment: 5000, paid: 2500, interest: 1125 }
+          ]
         },
         {
           id: "bills",
           title: "Fixed Bills & Utilities",
-          items: [{ name: "Rent / Mortgage", amount: 35000, paid: 20000 }]
+          items: [
+            { name: "Rent / Mortgage", amount: 35000, paid: 20000 },
+            { name: "Electricity & Water", amount: 4500, paid: 4500 }
+          ]
         },
         {
           id: "expenses",
           title: "Variable Monthly Expenses",
           isExpenseCategory: true,
-          items: [{ name: "Groceries & Supplies", projected: 20000, actual: 18500 }]
+          items: [
+            { name: "Groceries & Supplies", projected: 20000, actual: 18500 },
+            { name: "Fuel & Transit", projected: 10000, actual: 11200 }
+          ]
         },
         {
           id: "savings",
           title: "Savings & Investment Goals",
-          items: [{ name: "Chama / Sacco Deposits", amount: 10000, paid: 5000 }]
+          items: [
+            { name: "Chama / Sacco Deposits", amount: 10000, paid: 5000 }
+          ]
         }
       ];
     }
   </script>
 
   <style>
-    :root { --bg: #f8fafc; --card: #ffffff; --primary: #2563eb; --text: #1e293b; --border: #cbd5e1; --danger: #ef4444; --success: #10b981; --warning: #d97706; --whatsapp: #25d366; }
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --primary: #2563eb;
+      --text: #1e293b;
+      --border: #cbd5e1;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #d97706;
+      --whatsapp: #25d366;
+    }
+
     body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 12px; }
     .container { max-width: 1200px; margin: 0 auto; }
     header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
@@ -112,7 +137,7 @@
   <div class="container">
     <header>
       <div>
-        <h1 style="margin:0; font-size:22px;">Real-Time Budget</h1>
+        <h1 style="margin:0; font-size:22px;">Real-Time Budget Ledger</h1>
         <p style="margin:4px 0 0 0; font-size:12px; color:#64748b;">Live Web & Mobile Cloud Sync (KES)</p>
       </div>
       <div class="header-actions">
