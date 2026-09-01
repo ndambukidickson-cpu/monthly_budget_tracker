@@ -5,14 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Monthly Budget Ledger (KES)</title>
   
-  <!-- PWA Manifest Link & Theme Color -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2953/2953361.png">
 
-  <!-- Dexie.js for Automatic Persistent Storage -->
   <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
 
   <style>
@@ -84,21 +82,6 @@
       gap: 10px;
     }
 
-    .card-icon-bg {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .bg-blue { background: #dbeafe; color: #1d4ed8; }
-    .bg-green { background: #d1fae5; color: #047857; }
-    .bg-amber { background: #fef3c7; color: #b45309; }
-    .bg-emerald { background: #ecfdf5; color: #059669; }
-
     .card-info { display: flex; flex-direction: column; }
     .card-title { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; font-weight: 500; }
     .card-value { font-size: 15px; font-weight: 700; }
@@ -129,7 +112,6 @@
     }
 
     .category-title { font-size: 15px; font-weight: 600; margin: 0; }
-    .category-subtitle { font-size: 11px; color: var(--text-muted); font-weight: 400; display: block; }
 
     .item-list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -194,13 +176,14 @@
     <header>
       <div class="header-titles">
         <h1>Monthly Budget PWA</h1>
-        <p>Offline-ready app saved directly to your home screen.</p>
+        <p>Offline-ready ledger with local JSON data export.</p>
       </div>
       <div class="header-actions">
         <input type="file" id="json-file-input" accept=".json" onchange="handleJSONImport(event)">
         <button class="btn btn-whatsapp" onclick="shareOnWhatsApp()">WhatsApp Share</button>
-        <button class="btn btn-secondary" onclick="exportJSONBackup()">Backup Data</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('json-file-input').click()">Restore Data</button>
+        <button class="btn btn-secondary" onclick="exportJSONBackup()">Export JSON Backup</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('json-file-input').click()">Import JSON</button>
+        <button class="btn" onclick="window.print()">PDF Report</button>
       </div>
     </header>
 
@@ -235,14 +218,12 @@
   </div>
 
   <script>
-    // Register Service Worker for PWA Functionality
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
       });
     }
 
-    // Dexie IndexedDB
     const db = new Dexie('PWABudgetDB');
     db.version(1).stores({ settings: 'id, data' });
 
@@ -261,7 +242,6 @@
       {
         id: "mshwari_loans",
         title: "M-Shwari & Mobile Loans",
-        subtitle: "(Financing liability tracker; excluded from direct expenses)",
         isLoanCategory: true,
         isIncomeCategory: false,
         isExpenseCategory: false,
@@ -434,8 +414,9 @@
 
     function removeItem(catIdx, itemIdx) { budgetData[catIdx].items.splice(itemIdx, 1); render(); saveData(); }
 
+    // JSON Export Engine
     function exportJSONBackup() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(budgetData));
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(budgetData, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
       downloadAnchor.setAttribute("download", `budget_backup_${new Date().toISOString().slice(0, 10)}.json`);
@@ -444,6 +425,7 @@
       downloadAnchor.remove();
     }
 
+    // JSON Import Engine
     function handleJSONImport(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -451,8 +433,13 @@
       reader.onload = function(e) {
         try {
           const importedData = JSON.parse(e.target.result);
-          if (Array.isArray(importedData)) { budgetData = importedData; render(); saveData(); alert("Backup imported successfully!"); }
-        } catch (err) { alert("Invalid backup file."); }
+          if (Array.isArray(importedData)) { 
+            budgetData = importedData; 
+            render(); 
+            saveData(); 
+            alert("Budget data restored successfully!"); 
+          }
+        } catch (err) { alert("Invalid backup JSON file."); }
       };
       reader.readAsText(file);
     }
