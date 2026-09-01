@@ -127,9 +127,11 @@
     label { font-size: 10px; font-weight: 600; color: #64748b; }
     input { padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
     .btn { background: var(--primary); color: white; border: none; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+    .btn-secondary { background: #ffffff; color: var(--text); border: 1px solid var(--border); }
     .btn-whatsapp { background: var(--whatsapp); font-weight: 600; }
     .btn-add { width: 100%; margin-top: 8px; background: #f1f5f9; color: var(--text); border: 1px dashed var(--border); }
     .btn-delete { background: transparent; color: var(--danger); border: none; font-size: 12px; }
+    #csv-file-input, #json-file-input { display: none; }
   </style>
 </head>
 <body>
@@ -138,10 +140,16 @@
     <header>
       <div>
         <h1 style="margin:0; font-size:22px;">Real-Time Budget Ledger</h1>
-        <p style="margin:4px 0 0 0; font-size:12px; color:#64748b;">Live Web & Mobile Cloud Sync (KES)</p>
+        <p style="margin:4px 0 0 0; font-size:12px; color:#64748b;">Live Cloud Sync with CSV/JSON Restore (KES)</p>
       </div>
       <div class="header-actions">
+        <input type="file" id="csv-file-input" accept=".csv" onchange="handleCSVImport(event)">
+        <input type="file" id="json-file-input" accept=".json" onchange="handleJSONImport(event)">
+        
         <button class="btn btn-whatsapp" onclick="shareOnWhatsApp()">WhatsApp Share</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('csv-file-input').click()">Import CSV</button>
+        <button class="btn btn-secondary" onclick="exportJSONBackup()">Export Backup</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('json-file-input').click()">Import Backup</button>
         <button class="btn" onclick="window.print()">PDF Report</button>
       </div>
     </header>
@@ -278,6 +286,112 @@
     function removeItem(catIdx, itemIdx) {
       window.budgetData[catIdx].items.splice(itemIdx, 1);
       window.saveToCloud(window.budgetData);
+    }
+
+    // CSV Import Parser
+    function handleCSVImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        parseCSV(e.target.result);
+        event.target.value = "";
+      };
+      reader.readAsText(file);
+    }
+
+    function parseCSVLine(line) {
+      let values = [];
+      let currentVal = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        let char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') { currentVal += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (char === ',' && !inQuotes) {
+          values.push(currentVal.trim());
+          currentVal = '';
+        } else {
+          currentVal += char;
+        }
+      }
+      values.push(currentVal.trim());
+      return values;
+    }
+
+    function parseCSV(text) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length <= 1) return;
+
+      // Copy template structure
+      let newData = window.budgetData.length > 0 ? JSON.parse(JSON.stringify(window.budgetData)) : getDefaultData();
+      newData.forEach(cat => cat.items = []);
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        if (cols.length < 2) continue;
+
+        const catName = cols[0].toLowerCase();
+        const itemName = cols[1] || "Unnamed Entry";
+        const val1 = parseFloat(cols[2]) || 0;
+        const val2 = parseFloat(cols[3]) || 0;
+        const val3 = parseFloat(cols[4]) || 0;
+        const val4 = parseFloat(cols[5]) || 0;
+
+        let category = newData.find(c => {
+          const title = c.title.toLowerCase();
+          return title.includes(catName) || catName.includes(title) ||
+                 (catName.includes("loan") && c.isLoanCategory) ||
+                 (catName.includes("income") && c.isIncomeCategory) ||
+                 (catName.includes("bill") && c.id === "bills") ||
+                 (catName.includes("expense") && c.isExpenseCategory) ||
+                 (catName.includes("saving") && c.id === "savings");
+        });
+
+        if (!category) category = newData[2]; // Default to bills if unknown
+
+        if (category.isLoanCategory) {
+          category.items.push({ name: itemName, balance: val3, payment: val1, paid: val2, interest: val4 });
+        } else if (category.isIncomeCategory) {
+          category.items.push({ name: itemName, amount: val1 });
+        } else if (category.isExpenseCategory) {
+          category.items.push({ name: itemName, projected: val1, actual: val2 });
+        } else {
+          category.items.push({ name: itemName, amount: val1, paid: val2 });
+        }
+      }
+
+      window.saveToCloud(newData);
+      alert("CSV budget imported and synced successfully!");
+    }
+
+    // JSON Export / Import
+    function exportJSONBackup() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.budgetData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `budget_backup_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function handleJSONImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (Array.isArray(importedData)) { 
+            window.saveToCloud(importedData);
+            alert("Backup restored and synced across devices!"); 
+          }
+        } catch (err) { alert("Invalid backup JSON file."); }
+      };
+      reader.readAsText(file);
     }
 
     function shareOnWhatsApp() {
