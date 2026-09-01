@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Monthly Budget Ledger (KES)</title>
+  
+  <!-- PWA Manifest Link & Theme Color -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2953/2953361.png">
+
+  <!-- Dexie.js for Automatic Persistent Storage -->
+  <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --primary: #2563eb;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #d97706;
+      --mshwari-accent: #059669;
+      --whatsapp: #25d366;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 12px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .header-titles h1 {
+      margin: 0 0 4px 0;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-titles p { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+    .header-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    @media (min-width: 768px) {
+      body { padding: 24px; }
+      header { flex-direction: row; justify-content: space-between; align-items: center; }
+      .header-titles h1 { font-size: 28px; }
+      .dashboard { grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-icon-bg {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bg-blue { background: #dbeafe; color: #1d4ed8; }
+    .bg-green { background: #d1fae5; color: #047857; }
+    .bg-amber { background: #fef3c7; color: #b45309; }
+    .bg-emerald { background: #ecfdf5; color: #059669; }
+
+    .card-info { display: flex; flex-direction: column; }
+    .card-title { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; font-weight: 500; }
+    .card-value { font-size: 15px; font-weight: 700; }
+    .card-value.surplus { color: var(--success); }
+    .card-value.deficit { color: var(--danger); }
+    .card-value.interest { color: var(--warning); }
+
+    .category-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .category-section.mshwari-section {
+      border-left: 5px solid var(--mshwari-accent);
+      background: #f0fdf4;
+    }
+
+    .category-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    .category-title { font-size: 15px; font-weight: 600; margin: 0; }
+    .category-subtitle { font-size: 11px; color: var(--text-muted); font-weight: 400; display: block; }
+
+    .item-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .item-row-wrapper, .loan-row-wrapper {
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .grid-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+    label { font-size: 10px; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; display: block; }
+
+    input[type="text"], input[type="number"], input[type="date"] {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      width: 100%;
+      box-sizing: border-box;
+      background-color: #ffffff;
+      color: var(--text);
+    }
+
+    .row-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 4px;
+      border-top: 1px dashed #e2e8f0;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-secondary { background: #ffffff; color: var(--text); border: 1px solid var(--border); }
+    .btn-whatsapp { background: var(--whatsapp); color: white; font-weight: 600; }
+    .btn-add { width: 100%; justify-content: center; margin-top: 10px; background: #f1f5f9; color: var(--text); border: 1px dashed var(--border); }
+    .btn-delete { background: transparent; color: var(--danger); border: none; padding: 4px 8px; font-size: 12px; }
+
+    #json-file-input { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="header-titles">
+        <h1>Monthly Budget PWA</h1>
+        <p>Offline-ready app saved directly to your home screen.</p>
+      </div>
+      <div class="header-actions">
+        <input type="file" id="json-file-input" accept=".json" onchange="handleJSONImport(event)">
+        <button class="btn btn-whatsapp" onclick="shareOnWhatsApp()">WhatsApp Share</button>
+        <button class="btn btn-secondary" onclick="exportJSONBackup()">Backup Data</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('json-file-input').click()">Restore Data</button>
+      </div>
+    </header>
+
+    <div class="dashboard">
+      <div class="card">
+        <div class="card-info">
+          <div class="card-title">Income</div>
+          <div class="card-value" id="total-income">KES 0</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-info">
+          <div class="card-title">Expenses Paid</div>
+          <div class="card-value" id="total-outflows">KES 0</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-info">
+          <div class="card-title">Net Saved</div>
+          <div class="card-value surplus" id="net-saved">KES 0</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-info">
+          <div class="card-title">Loan Fees</div>
+          <div class="card-value interest" id="total-interest">KES 0</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="budget-sections"></div>
+  </div>
+
+  <script>
+    // Register Service Worker for PWA Functionality
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+      });
+    }
+
+    // Dexie IndexedDB
+    const db = new Dexie('PWABudgetDB');
+    db.version(1).stores({ settings: 'id, data' });
+
+    let budgetData = [
+      {
+        id: "income",
+        title: "Income Sources",
+        isLoanCategory: false,
+        isIncomeCategory: true,
+        isExpenseCategory: false,
+        items: [
+          { name: "Net Salary / Primary Income", amount: 120000, dueDate: "2026-09-01" },
+          { name: "Side Business / Freelance", amount: 25000, dueDate: "2026-09-15" }
+        ]
+      },
+      {
+        id: "mshwari_loans",
+        title: "M-Shwari & Mobile Loans",
+        subtitle: "(Financing liability tracker; excluded from direct expenses)",
+        isLoanCategory: true,
+        isIncomeCategory: false,
+        isExpenseCategory: false,
+        items: [
+          { name: "Fuliza Overdraft", balance: 5000, payment: 2000, paid: 1000, interest: 250, dueDate: "2026-08-25" },
+          { name: "M-Shwari Personal Facility 1", balance: 15000, payment: 5000, paid: 2500, interest: 1125, dueDate: "2026-08-31" }
+        ]
+      },
+      {
+        id: "bills",
+        title: "Fixed Bills & Utilities",
+        isLoanCategory: false,
+        isIncomeCategory: false,
+        isExpenseCategory: false,
+        items: [
+          { name: "Rent / Mortgage", amount: 35000, paid: 20000, dueDate: "2026-09-01" },
+          { name: "Electricity & Water", amount: 4500, paid: 4500, dueDate: "2026-08-28" }
+        ]
+      },
+      {
+        id: "expenses",
+        title: "Variable Monthly Expenses",
+        isLoanCategory: false,
+        isIncomeCategory: false,
+        isExpenseCategory: true,
+        items: [
+          { name: "Groceries & Supplies", projected: 20000, actual: 18500, dueDate: "2026-09-02" },
+          { name: "Fuel & Transit", projected: 10000, actual: 11200, dueDate: "2026-09-01" }
+        ]
+      },
+      {
+        id: "savings",
+        title: "Savings & Investments",
+        isLoanCategory: false,
+        isIncomeCategory: false,
+        isExpenseCategory: false,
+        items: [
+          { name: "Chama / Sacco Deposits", amount: 10000, paid: 5000, dueDate: "2026-09-10" }
+        ]
+      }
+    ];
+
+    async function loadSavedData() {
+      try {
+        const savedRecord = await db.settings.get('budget_state');
+        if (savedRecord && savedRecord.data) budgetData = savedRecord.data;
+      } catch (err) {}
+      render();
+    }
+
+    async function saveData() {
+      try { await db.settings.put({ id: 'budget_state', data: budgetData }); } catch (err) {}
+      localStorage.setItem('budget_state', JSON.stringify(budgetData));
+    }
+
+    function render() {
+      const container = document.getElementById("budget-sections");
+      if (!container) return;
+      let html = "";
+
+      budgetData.forEach((category, catIdx) => {
+        let itemsHTML = "";
+
+        if (category.isLoanCategory) {
+          itemsHTML = category.items.map((item, itemIdx) => `
+            <div class="loan-row-wrapper">
+              <div><label>Loan Reference</label><input type="text" value="${escapeHtml(item.name)}" onchange="updateLoanItem(${catIdx}, ${itemIdx}, 'name', this.value)"></div>
+              <div class="grid-row">
+                <div><label>Balance</label><input type="number" value="${item.balance || 0}" onchange="updateLoanItem(${catIdx}, ${itemIdx}, 'balance', this.value)"></div>
+                <div><label>Target</label><input type="number" value="${item.payment || 0}" onchange="updateLoanItem(${catIdx}, ${itemIdx}, 'payment', this.value)"></div>
+              </div>
+              <div class="grid-row">
+                <div><label>Paid</label><input type="number" value="${item.paid || 0}" onchange="updateLoanItem(${catIdx}, ${itemIdx}, 'paid', this.value)"></div>
+                <div><label>Fee/Interest</label><input type="number" value="${item.interest || 0}" onchange="updateLoanItem(${catIdx}, ${itemIdx}, 'interest', this.value)"></div>
+              </div>
+              <div class="row-footer"><button class="btn-delete" onclick="removeItem(${catIdx}, ${itemIdx})">Remove</button></div>
+            </div>
+          `).join("");
+        } else if (category.isIncomeCategory) {
+          itemsHTML = category.items.map((item, itemIdx) => `
+            <div class="item-row-wrapper">
+              <div><label>Income Source</label><input type="text" value="${escapeHtml(item.name)}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'name', this.value)"></div>
+              <div><label>Amount (KES)</label><input type="number" value="${item.amount || 0}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'amount', this.value)"></div>
+              <div class="row-footer"><button class="btn-delete" onclick="removeItem(${catIdx}, ${itemIdx})">Remove</button></div>
+            </div>
+          `).join("");
+        } else if (category.isExpenseCategory) {
+          itemsHTML = category.items.map((item, itemIdx) => `
+            <div class="item-row-wrapper">
+              <div><label>Expense Description</label><input type="text" value="${escapeHtml(item.name)}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'name', this.value)"></div>
+              <div class="grid-row">
+                <div><label>Projected</label><input type="number" value="${item.projected || 0}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'projected', this.value)"></div>
+                <div><label>Actual</label><input type="number" value="${item.actual || 0}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'actual', this.value)"></div>
+              </div>
+              <div class="row-footer"><button class="btn-delete" onclick="removeItem(${catIdx}, ${itemIdx})">Remove</button></div>
+            </div>
+          `).join("");
+        } else {
+          itemsHTML = category.items.map((item, itemIdx) => `
+            <div class="item-row-wrapper">
+              <div><label>Item Description</label><input type="text" value="${escapeHtml(item.name)}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'name', this.value)"></div>
+              <div class="grid-row">
+                <div><label>Target</label><input type="number" value="${item.amount || 0}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'amount', this.value)"></div>
+                <div><label>Paid</label><input type="number" value="${item.paid || 0}" onchange="updateStandardItem(${catIdx}, ${itemIdx}, 'paid', this.value)"></div>
+              </div>
+              <div class="row-footer"><button class="btn-delete" onclick="removeItem(${catIdx}, ${itemIdx})">Remove</button></div>
+            </div>
+          `).join("");
+        }
+
+        html += `
+          <div class="category-section ${category.isLoanCategory ? 'mshwari-section' : ''}">
+            <div class="category-header"><h2 class="category-title">${category.title}</h2></div>
+            <div class="item-list">${itemsHTML}</div>
+            <button class="btn btn-add" onclick="addItem(${catIdx})">+ Add Line Item</button>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      calculateTotals();
+    }
+
+    function escapeHtml(str) { return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+    function calculateTotals() {
+      let incomeTotal = 0, billsPaidTotal = 0, expensesActualTotal = 0, savingsPaidTotal = 0, interestTotal = 0;
+
+      budgetData.forEach(cat => {
+        if (cat.id === "income") incomeTotal += cat.items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+        else if (cat.id === "mshwari_loans") cat.items.forEach(i => interestTotal += parseFloat(i.interest) || 0);
+        else if (cat.id === "bills") billsPaidTotal += cat.items.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0);
+        else if (cat.id === "expenses") expensesActualTotal += cat.items.reduce((s, i) => s + (parseFloat(i.actual) || 0), 0);
+        else if (cat.id === "savings") savingsPaidTotal += cat.items.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0);
+      });
+
+      const totalOutflowsPaid = billsPaidTotal + expensesActualTotal + savingsPaidTotal;
+      const netSaved = incomeTotal - totalOutflowsPaid;
+
+      document.getElementById("total-income").textContent = formatCurrency(incomeTotal);
+      document.getElementById("total-outflows").textContent = formatCurrency(totalOutflowsPaid);
+      document.getElementById("total-interest").textContent = formatCurrency(interestTotal);
+      
+      const savedEl = document.getElementById("net-saved");
+      savedEl.textContent = formatCurrency(netSaved);
+      savedEl.className = netSaved < 0 ? "card-value deficit" : "card-value surplus";
+    }
+
+    function formatCurrency(val) { return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(val); }
+
+    function updateStandardItem(catIdx, itemIdx, field, val) {
+      if (['amount','paid','projected','actual'].includes(field)) budgetData[catIdx].items[itemIdx][field] = parseFloat(val) || 0;
+      else budgetData[catIdx].items[itemIdx][field] = val;
+      calculateTotals(); saveData();
+    }
+
+    function updateLoanItem(catIdx, itemIdx, field, val) {
+      if (['balance','payment','paid','interest'].includes(field)) budgetData[catIdx].items[itemIdx][field] = parseFloat(val) || 0;
+      else budgetData[catIdx].items[itemIdx][field] = val;
+      calculateTotals(); saveData();
+    }
+
+    function addItem(catIdx) {
+      if (budgetData[catIdx].isLoanCategory) budgetData[catIdx].items.push({ name: "", balance: 0, payment: 0, paid: 0, interest: 0 });
+      else if (budgetData[catIdx].isIncomeCategory) budgetData[catIdx].items.push({ name: "", amount: 0 });
+      else if (budgetData[catIdx].isExpenseCategory) budgetData[catIdx].items.push({ name: "", projected: 0, actual: 0 });
+      else budgetData[catIdx].items.push({ name: "", amount: 0, paid: 0 });
+      render(); saveData();
+    }
+
+    function removeItem(catIdx, itemIdx) { budgetData[catIdx].items.splice(itemIdx, 1); render(); saveData(); }
+
+    function exportJSONBackup() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(budgetData));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `budget_backup_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function handleJSONImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (Array.isArray(importedData)) { budgetData = importedData; render(); saveData(); alert("Backup imported successfully!"); }
+        } catch (err) { alert("Invalid backup file."); }
+      };
+      reader.readAsText(file);
+    }
+
+    function shareOnWhatsApp() {
+      const summaryText = `*MONTHLY FINANCIAL REPORT (KES)*\n` +
+        `• *Total Income:* ${document.getElementById("total-income").textContent}\n` +
+        `• *Paid Expenses:* ${document.getElementById("total-outflows").textContent}\n` +
+        `• *Net Saved:* ${document.getElementById("net-saved").textContent}\n` +
+        `• *Total Interest/Fees:* ${document.getElementById("total-interest").textContent}\n\n` +
+        `Generated on: ${new Date().toLocaleDateString('en-KE')}`;
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(summaryText)}`, '_blank');
+    }
+
+    window.addEventListener("DOMContentLoaded", () => { loadSavedData(); });
+  </script>
+</body>
+</html>
